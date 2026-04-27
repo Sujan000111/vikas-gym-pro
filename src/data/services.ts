@@ -1,0 +1,88 @@
+import type { Service, MembershipPlan } from '@/types';
+
+export const GYM_SERVICES: Service[] = [
+  {
+    id: 'svc-1',
+    title: 'Strength Training',
+    icon: 'Dumbbell',
+    description: 'Progressive overload programming with free weights, barbells, and machines built for serious lifters.',
+    included: ['Personalized program', 'Form coaching', 'Progress tracking', 'Spotter on call'],
+    duration: '60–75 min',
+    suitableFor: ['Beginner', 'Intermediate', 'Advanced'],
+    price: '₹1,500/session',
+  },
+  {
+    id: 'svc-2',
+    title: 'Personal Coaching',
+    icon: 'UserCog',
+    description: '1-on-1 sessions with certified trainers. Custom plans, accountability, and unmatched attention to detail.',
+    included: ['Goal mapping', 'Weekly check-ins', 'Custom programming', 'Recovery planning'],
+    duration: '60 min',
+    suitableFor: ['Beginner', 'Intermediate', 'Advanced'],
+    price: '₹2,500/session',
+  },
+  {
+    id: 'svc-3',
+    title: 'Group HIIT',
+    icon: 'Flame',
+    description: 'High-intensity circuits in small groups. Burn calories, build conditioning, and push harder together.',
+    included: ['Coach-led format', 'Heart-rate zones', 'Scaled options', 'Community vibe'],
+    duration: '45 min',
+    suitableFor: ['Intermediate', 'Advanced'],
+    price: '₹800/session',
+  },
+  {
+    id: 'svc-4',
+    title: 'Nutrition Planning',
+    icon: 'Salad',
+    description: 'Macro-based meal plans tailored to your training, lifestyle, and dietary preferences.',
+    included: ['Macro calculation', '4-week meal plan', 'Grocery list', 'Bi-weekly review'],
+    duration: '30 min consult',
+    suitableFor: ['Beginner', 'Intermediate', 'Advanced'],
+    price: '₹3,000/month',
+  },
+  {
+    id: 'svc-5',
+    title: 'Functional Training',
+    icon: 'Activity',
+    description: 'Movement-first training with kettlebells, sleds, and bodyweight to build real-world strength.',
+    included: ['Mobility prep', 'Kettlebell flows', 'Carry work', 'Core stability'],
+    duration: '50 min',
+    suitableFor: ['Beginner', 'Intermediate'],
+    price: '₹1,200/session',
+  },
+  {
+    id: 'svc-6',
+    title: 'Recovery & Mobility',
+    icon: 'HeartPulse',
+    description: 'Foam rolling, stretching protocols, and mobility drills to keep you training pain-free.',
+    included: ['Mobility audit', 'Daily routines', 'Soft-tissue work', 'Sleep guidance'],
+    duration: '40 min',
+    suitableFor: ['Beginner', 'Intermediate', 'Advanced'],
+    price: '₹900/session',
+  },
+];
+
+export const MEMBERSHIP_PLANS: MembershipPlan[] = [
+  {
+    tier: 'Basic',
+    price: '₹1,499',
+    features: ['Gym floor access', 'Locker room', 'Basic orientation', 'Open-hours access'],
+    unavailableFeatures: ['Personal coaching', 'Group classes', 'Nutrition plan', 'Recovery suite'],
+    isPopular: false,
+  },
+  {
+    tier: 'Pro',
+    price: '₹2,999',
+    features: ['Everything in Basic', '4 group classes / month', 'Quarterly assessment', 'Nutrition starter guide', 'Locker reserved'],
+    unavailableFeatures: ['Unlimited 1-on-1 coaching', 'Recovery suite'],
+    isPopular: true,
+  },
+  {
+    tier: 'Elite',
+    price: '₹5,499',
+    features: ['Everything in Pro', 'Unlimited group classes', '4 personal sessions / month', 'Custom nutrition plan', 'Recovery suite access', 'Priority booking'],
+    unavailableFeatures: [],
+    isPopular: false,
+  },
+];
