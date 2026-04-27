@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Activity, Award, Brain, Check, Dumbbell, Flame, HeartPulse, Salad, Trophy, UserCog } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PageBanner } from '@/components/ui/PageBanner';
@@ -17,7 +18,9 @@ const SUIT_COLORS: Record<Suitability, string> = {
 function ServiceDetailCard({ s }: { s: Service }) {
   const Icon = ICONS[s.icon] ?? Dumbbell;
   const enquire = (): void => {
-    window.open(`https://wa.me/919876543210?text=${encodeURIComponent(`Hi VikasGym, I want info on ${s.title}.`)}`, '_blank');
+    const subject = `VikasGym Enquiry — ${s.title}`;
+    const body = `Hi VikasGym,%0D%0A%0D%0AI want more info on: ${encodeURIComponent(s.title)}%0D%0A%0D%0AThanks,`;
+    window.location.href = `mailto:hello@vikasgym.com?subject=${encodeURIComponent(subject)}&body=${body}`;
   };
   return (
     <div className="card-vg p-7 flex flex-col">
@@ -43,7 +46,7 @@ function ServiceDetailCard({ s }: { s: Service }) {
         ))}
       </div>
 
-      <VGButton variant="outline" size="sm" onClick={enquire} className="w-full mt-auto">Enquire on WhatsApp</VGButton>
+      <VGButton variant="outline" size="sm" onClick={enquire} className="w-full mt-auto">Enquire via Email</VGButton>
     </div>
   );
 }
@@ -85,9 +88,9 @@ export default function Services() {
         <div className="container-vg text-center">
           <h2 className="font-display text-5xl md:text-6xl mb-3">READY TO START?</h2>
           <p className="text-[hsl(var(--text-body))] mb-8">Book a tour. Train a session. See for yourself.</p>
-          <a href="/#auth">
+          <Link to="/register">
             <VGButton size="lg" variant="primary">Join VikasGym</VGButton>
-          </a>
+          </Link>
         </div>
       </section>
     </>

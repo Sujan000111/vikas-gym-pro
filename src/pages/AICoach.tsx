@@ -1,11 +1,13 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Download, Printer, Sparkles } from 'lucide-react';
 import { PageBanner } from '@/components/ui/PageBanner';
 import { VGButton } from '@/components/ui/VGButton';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { useToast } from '@/context/ToastContext';
-import type { ActivityLevel, AICoachFormData, AICoachResult, DietaryPreference, Gender, GoalType } from '@/types';
-import { generateAIPlan } from '@/utils/aiCoachMock';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
+import type { ActivityLevel, AICoachFormData, AICoachResult, DietaryPreference, Gender, GoalType, SavedAIPlan } from '@/types';
+import { generateAIPlan } from '@/utils/aiCoachService';
 import { cn } from '@/lib/utils';
 
 const GOALS: { v: GoalType; l: string; sub: string }[] = [
@@ -26,8 +28,15 @@ const DIETS: { v: DietaryPreference; l: string }[] = [
 
 const initial: AICoachFormData = {
   name: '', age: 25, gender: 'male', heightCm: 175, weightKg: 75,
-  goal: 'muscle_gain', activityLevel: 'moderate', dietaryPreference: 'non_veg', limitations: '',
+  goal: 'muscle_gain', activityLevel: 'moderate', dietaryPreference: 'non_veg', trainingDays: 5, equipment: 'full_gym', sleepHours: 7, limitations: '',
 };
+
+interface AIPlanRow {
+  id: string;
+  created_at: string;
+  input_json: AICoachFormData;
+  output_json: AICoachResult;
+}
 
 function downloadPlan(form: AICoachFormData, r: AICoachResult): void {
   const lines: string[] = [];
@@ -64,19 +73,117 @@ function downloadPlan(form: AICoachFormData, r: AICoachResult): void {
 export default function AICoach() {
   const [form, setForm] = useState<AICoachFormData>(initial);
   const [result, setResult] = useState<AICoachResult | null>(null);
+  const [savedPlans, setSavedPlans] = useState<SavedAIPlan[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
   const [tab, setTab] = useState<'diet' | 'workout'>('diet');
   const { addToast } = useToast();
+  const { userId, userEmail } = useAuth();
+
+  useEffect(() => {
+    const hydrateProfileDefaults = async (): Promise<void> => {
+      if (!userId && !userEmail) return;
+
+      const q = supabase
+        .from('app_users')
+        .select('full_name,dob')
+        .limit(1)
+        .maybeSingle();
+
+      const { data, error } = userId
+        ? await q.eq('id', userId)
+        : await q.eq('email', userEmail ?? '');
+
+      if (error || !data) return;
+
+      const dob = data.dob ? new Date(data.dob as string) : null;
+      const now = new Date();
+      const derivedAge = dob
+        ? Math.max(
+            12,
+            Math.min(
+              90,
+              now.getFullYear() -
+                dob.getFullYear() -
+                (now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate()) ? 1 : 0),
+            ),
+          )
+        : null;
+
+      setForm((prev) => ({
+        ...prev,
+        name: prev.name.trim() ? prev.name : String(data.full_name ?? ''),
+        age: derivedAge ?? prev.age,
+      }));
+    };
+
+    void hydrateProfileDefaults();
+  }, [userId, userEmail]);
+
+  useEffect(() => {
+    const loadSavedPlans = async (): Promise<void> => {
+      setLoadingHistory(true);
+      const q = supabase
+        .from('ai_plans')
+        .select('id,created_at,input_json,output_json')
+        .order('created_at', { ascending: false })
+        .limit(8);
+      const { data, error } = userId
+        ? await q.eq('user_id', userId)
+        : await q.eq('email', userEmail ?? '');
+
+      if (error) {
+        setLoadingHistory(false);
+        return;
+      }
+      const mapped = ((data ?? []) as AIPlanRow[]).map((p) => ({
+        id: p.id,
+        createdAt: p.created_at,
+        form: p.input_json,
+        result: p.output_json,
+      }));
+      setSavedPlans(mapped);
+      setLoadingHistory(false);
+    };
+
+    if (userId || userEmail) {
+      void loadSavedPlans();
+    } else {
+      setSavedPlans([]);
+      setLoadingHistory(false);
+    }
+  }, [userId, userEmail]);
 
   const handleSubmit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
     if (!form.name.trim()) { addToast('Please enter your name.', 'error'); return; }
     if (form.age < 12 || form.age > 90) { addToast('Age must be between 12 and 90.', 'error'); return; }
     if (form.heightCm < 120 || form.weightKg < 30) { addToast('Please enter realistic height & weight.', 'error'); return; }
+    if (form.trainingDays < 3 || form.trainingDays > 7) { addToast('Training days must be between 3 and 7.', 'error'); return; }
+    if (form.sleepHours < 3 || form.sleepHours > 12) { addToast('Sleep hours must be between 3 and 12.', 'error'); return; }
     setLoading(true);
     try {
       const r = await generateAIPlan(form);
       setResult(r);
+      const { data: inserted, error } = await supabase
+        .from('ai_plans')
+        .insert({
+          user_id: userId,
+          email: userEmail ?? null,
+          input_json: form,
+          output_json: r,
+        })
+        .select('id,created_at,input_json,output_json')
+        .single();
+      if (!error && inserted) {
+        const mapped: SavedAIPlan = {
+          id: (inserted as AIPlanRow).id,
+          createdAt: (inserted as AIPlanRow).created_at,
+          form: (inserted as AIPlanRow).input_json,
+          result: (inserted as AIPlanRow).output_json,
+        };
+        setSavedPlans((prev) => [mapped, ...prev].slice(0, 8));
+      }
       addToast('Plan generated. Scroll down.', 'success');
       setTimeout(() => document.getElementById('ai-results')?.scrollIntoView({ behavior: 'smooth' }), 200);
     } catch {
@@ -107,6 +214,25 @@ export default function AICoach() {
             <div>
               <label className="block text-xs uppercase tracking-widest text-[hsl(var(--text-muted))] mb-2">Age</label>
               <input type="number" min={12} max={90} value={form.age} onChange={(e) => setForm({ ...form, age: Number(e.target.value) })} className={inputCls} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-[hsl(var(--text-muted))] mb-2">Training Days / Week</label>
+              <input type="number" min={3} max={7} value={form.trainingDays} onChange={(e) => setForm({ ...form, trainingDays: Number(e.target.value) })} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-[hsl(var(--text-muted))] mb-2">Equipment</label>
+              <select value={form.equipment} onChange={(e) => setForm({ ...form, equipment: e.target.value as AICoachFormData['equipment'] })} className={inputCls}>
+                <option value="full_gym">Full Gym</option>
+                <option value="dumbbells">Dumbbells</option>
+                <option value="bodyweight">Bodyweight</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-[hsl(var(--text-muted))] mb-2">Sleep Hours</label>
+              <input type="number" min={3} max={12} value={form.sleepHours} onChange={(e) => setForm({ ...form, sleepHours: Number(e.target.value) })} className={inputCls} />
             </div>
           </div>
 
@@ -185,6 +311,34 @@ export default function AICoach() {
             {loading ? 'Generating Your Plan…' : 'Generate My Plan'}
           </VGButton>
         </form>
+      </section>
+
+      <section className="py-4 container-vg max-w-4xl">
+        <div className="card-vg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-display text-3xl">PREVIOUS PLANS</h3>
+            <div className="text-xs text-[hsl(var(--text-muted))]">Last 8 plans</div>
+          </div>
+          {loadingHistory ? (
+            <div className="text-sm text-[hsl(var(--text-muted))]">Loading previous plans...</div>
+          ) : savedPlans.length === 0 ? (
+            <div className="text-sm text-[hsl(var(--text-muted))]">No saved plans yet.</div>
+          ) : (
+            <div className="space-y-2">
+              {savedPlans.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => { setForm(p.form); setResult(p.result); setTab('diet'); setTimeout(() => document.getElementById('ai-results')?.scrollIntoView({ behavior: 'smooth' }), 200); }}
+                  className="w-full text-left p-3 rounded-sm border border-[hsl(var(--border-color))] hover:border-[hsl(var(--red))] transition"
+                >
+                  <div className="text-sm font-semibold">{p.form.goal.replace('_', ' ')} • {p.form.trainingDays} days • {p.form.equipment}</div>
+                  <div className="text-xs text-[hsl(var(--text-muted))]">{new Date(p.createdAt).toLocaleString()} • Target {p.result.targetCalories} kcal</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       {result && (

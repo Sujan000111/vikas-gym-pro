@@ -1,14 +1,14 @@
-import { GraduationCap, Linkedin, Instagram, MessageCircle, Quote } from 'lucide-react';
+import { GraduationCap, Linkedin, Instagram, Quote } from 'lucide-react';
 import { PageBanner } from '@/components/ui/PageBanner';
 import { TRAINERS } from '@/data/trainers';
 
-const CREDENTIALS: string[] = ['NHCE Alumni', 'NSCA-CSCS', 'Precision Nutrition', '9+ Years Coaching'];
+const CREDENTIALS: string[] = ['Final Year - NHCE', 'NSCA-CSCS', 'Precision Nutrition', '9+ Years Coaching'];
 
 const TIMELINE: { year: string; title: string; description: string }[] = [
-  { year: '2021', title: 'Studio Founded', description: 'Vikas opens a 1,200 sq ft training studio near NHCE.' },
-  { year: '2022', title: 'First 100 Members', description: 'Word spreads. Demand outgrows the original space within a year.' },
-  { year: '2023', title: 'Full-Scale Gym', description: 'Move to 4,500 sq ft flagship facility with full strength + conditioning floor.' },
-  { year: '2025', title: '500+ Strong', description: 'A team of 12 coaches. The most respected gym in the area.' },
+  { year: '2021', title: 'Studio Founded', description: 'Vikas starts a compact coaching studio close to NHCE.' },
+  { year: '2022', title: '100 Members', description: 'Early student and local member transformations drive rapid growth.' },
+  { year: '2023', title: 'Expanded Facility', description: 'The gym scales to a larger strength and conditioning floor.' },
+  { year: '2025', title: '500+ Community', description: 'A strong coaching team supports members across goals and levels.' },
 ];
 
 const VALUES: { name: string; line: string }[] = [
@@ -21,7 +21,7 @@ const VALUES: { name: string; line: string }[] = [
 export default function About() {
   return (
     <>
-      <PageBanner title="OUR STORY" subtitle="Built in Bengaluru. Trained for life." breadcrumb={['Home', 'About']} />
+      <PageBanner title="Our Story" subtitle="Built in Bengaluru. Trained for life." breadcrumb={['Home', 'About']} />
 
       {/* Founder */}
       <section className="py-20 container-vg grid grid-cols-1 lg:grid-cols-12 gap-12">
@@ -40,7 +40,7 @@ export default function About() {
                 ))}
               </div>
               <div className="flex gap-3 justify-center mt-6">
-                {[Linkedin, Instagram, MessageCircle].map((I, i) => (
+                {[Linkedin, Instagram].map((I, i) => (
                   <a key={i} href="#" className="w-10 h-10 border border-[hsl(var(--border-color))] flex items-center justify-center text-[hsl(var(--text-body))] hover:text-[hsl(var(--red))] hover:border-[hsl(var(--red))] transition rounded-sm">
                     <I className="w-4 h-4" />
                   </a>
@@ -56,9 +56,9 @@ export default function About() {
             "Strength is built in silence. Character is built when nobody's watching. We coach both."
           </p>
           <div className="space-y-4 text-[hsl(var(--text-body))]">
-            <p>Vikas AP started lifting at 16. By his final year at New Horizon College of Engineering, he was coaching classmates in a campus corner — for free, for the love of it.</p>
-            <p>What began as helping friends became a calling. After certifications under NSCA and Precision Nutrition, he launched VikasGym in 2021 with a single mission: bring evidence-based, no-shortcuts coaching to Bengaluru.</p>
-            <p>Four years later, VikasGym is home to 500+ members, 12 coaches, and a culture built on discipline, science, and respect. The vision is simple — be the gym serious lifters deserve.</p>
+            <p>Vikas AP started lifting at 16. In his final year at New Horizon College of Engineering, he began coaching classmates in a small campus corner.</p>
+            <p>That early mentorship became a mission. With NSCA and Precision Nutrition certifications, he launched VikasGym to deliver evidence-based coaching to the Bengaluru fitness community.</p>
+            <p>Today, VikasGym supports 500+ members with a disciplined, science-driven approach and a supportive coaching team focused on long-term results.</p>
           </div>
         </div>
       </section>

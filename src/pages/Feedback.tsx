@@ -1,12 +1,12 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { PageBanner } from '@/components/ui/PageBanner';
 import { VGButton } from '@/components/ui/VGButton';
 import { StarRating } from '@/components/ui/StarRating';
-import { TESTIMONIALS } from '@/data/testimonials';
 import { useToast } from '@/context/ToastContext';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
-import type { FeedbackEntry, MembershipTier } from '@/types';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
+import type { MembershipTier } from '@/types';
 import { cn } from '@/lib/utils';
 
 const MAX_CHARS = 500;
@@ -21,12 +21,80 @@ const initial: FormState = {
   rating: 5, feedbackText: '', wouldRecommend: true,
 };
 
+interface FeedbackRow {
+  id: string;
+  name: string;
+  membership_type: MembershipTier;
+  rating: 1 | 2 | 3 | 4 | 5;
+  feedback_text: string;
+  member_duration: string;
+  created_at: string;
+}
+
 export default function Feedback() {
   const [state, setState] = useState<FormState>(initial);
   const [submitted, setSubmitted] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
+  const [memberFeedback, setMemberFeedback] = useState<FeedbackRow[]>([]);
+  const [loadingFeedback, setLoadingFeedback] = useState<boolean>(true);
+  const [feedbackStats, setFeedbackStats] = useState<{ avg: string; total: number; recommend: number }>({
+    avg: '0.0',
+    total: 0,
+    recommend: 0,
+  });
   const { addToast } = useToast();
-  const [stored, setStored] = useLocalStorage<FeedbackEntry[]>('vg_feedback', []);
+  const { userId, userEmail } = useAuth();
+
+  useEffect(() => {
+    const loadFeedback = async (): Promise<void> => {
+      setLoadingFeedback(true);
+      const { data, error } = await supabase
+        .from('feedback')
+        .select('id,name,membership_type,rating,feedback_text,member_duration,created_at,would_recommend')
+        .order('created_at', { ascending: false })
+        .limit(24);
+
+      if (!error) {
+        const rows = (data ?? []) as (FeedbackRow & { would_recommend?: boolean })[];
+        setMemberFeedback(rows);
+        const total = rows.length;
+        const avg = total ? (rows.reduce((sum, r) => sum + Number(r.rating), 0) / total).toFixed(1) : '0.0';
+        const recommend = total
+          ? Math.round((rows.filter((r) => Boolean(r.would_recommend)).length / total) * 100)
+          : 0;
+        setFeedbackStats({ avg, total, recommend });
+      }
+      setLoadingFeedback(false);
+    };
+
+    void loadFeedback();
+  }, []);
+
+  useEffect(() => {
+    const hydrateDefaults = async (): Promise<void> => {
+      if (!userId && !userEmail) return;
+
+      const q = supabase
+        .from('app_users')
+        .select('full_name,email')
+        .limit(1)
+        .maybeSingle();
+
+      const { data, error } = userId
+        ? await q.eq('id', userId)
+        : await q.eq('email', userEmail ?? '');
+
+      if (error || !data) return;
+
+      setState((prev) => ({
+        ...prev,
+        name: prev.name.trim() ? prev.name : String(data.full_name ?? ''),
+        email: prev.email.trim() ? prev.email : String(data.email ?? userEmail ?? ''),
+      }));
+    };
+
+    void hydrateDefaults();
+  }, [userId, userEmail]);
 
   const handleSubmit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
@@ -38,18 +106,55 @@ export default function Feedback() {
       addToast('Let us know if you would recommend us.', 'error');
       return;
     }
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 700));
-    const entry: FeedbackEntry = {
-      id: `fb-${Date.now()}`,
-      name: state.name, email: state.email, membershipType: state.membershipType,
-      memberDuration: state.memberDuration, rating: state.rating, feedbackText: state.feedbackText,
-      wouldRecommend: state.wouldRecommend, createdAt: new Date().toISOString(),
+    const optimisticId = `temp-${Date.now()}`;
+    const optimisticRow: FeedbackRow = {
+      id: optimisticId,
+      name: state.name,
+      membership_type: state.membershipType,
+      rating: state.rating,
+      feedback_text: state.feedbackText,
+      member_duration: state.memberDuration,
+      created_at: new Date().toISOString(),
     };
-    setStored([entry, ...stored]);
-    setLoading(false);
-    setSubmitted(true);
-    addToast('Thanks for the feedback!', 'success');
+
+    // Show immediately in UI before DB roundtrip.
+    setMemberFeedback((prev) => [optimisticRow, ...prev].slice(0, 24));
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('feedback')
+        .insert({
+          name: state.name,
+          email: state.email,
+          membership_type: state.membershipType,
+          member_duration: state.memberDuration,
+          rating: state.rating,
+          feedback_text: state.feedbackText,
+          would_recommend: state.wouldRecommend,
+        });
+      if (error) throw error;
+
+      setFeedbackStats((prev) => {
+        const nextTotal = prev.total + 1;
+        const currentAvg = Number(prev.avg);
+        const nextAvg = ((currentAvg * prev.total + state.rating) / nextTotal).toFixed(1);
+        const currentRecommendCount = Math.round((prev.recommend / 100) * prev.total);
+        const nextRecommendCount = currentRecommendCount + (state.wouldRecommend ? 1 : 0);
+        const nextRecommend = Math.round((nextRecommendCount / nextTotal) * 100);
+        return { avg: nextAvg, total: nextTotal, recommend: nextRecommend };
+      });
+
+      setSubmitted(true);
+      addToast('Thanks for the feedback!', 'success');
+      setTimeout(() => document.getElementById('member-feedback')?.scrollIntoView({ behavior: 'smooth' }), 200);
+    } catch (err) {
+      // Roll back optimistic row when DB insert fails.
+      setMemberFeedback((prev) => prev.filter((f) => f.id !== optimisticId));
+      const message = err instanceof Error ? err.message : 'Could not submit feedback.';
+      addToast(message, 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const reset = (): void => {
@@ -65,9 +170,9 @@ export default function Feedback() {
       <section className="py-12 bg-[hsl(var(--bg-surface))] border-b border-[hsl(var(--border-color))]">
         <div className="container-vg grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
-            { v: '4.9/5', l: 'Average Rating' },
-            { v: '500+', l: 'Reviews Collected' },
-            { v: '98%', l: 'Would Recommend' },
+            { v: `${feedbackStats.avg}/5`, l: 'Average Rating' },
+            { v: `${feedbackStats.total}+`, l: 'Reviews Collected' },
+            { v: `${feedbackStats.recommend}%`, l: 'Would Recommend' },
           ].map((s) => (
             <div key={s.l} className="card-vg p-6 text-center">
               <div className="font-display text-5xl text-[hsl(var(--red))]">{s.v}</div>
@@ -167,25 +272,33 @@ export default function Feedback() {
       </section>
 
       {/* Existing testimonials */}
-      <section className="py-20 bg-[hsl(var(--bg-surface))] border-t border-[hsl(var(--border-color))]">
+      <section id="member-feedback" className="py-20 bg-[hsl(var(--bg-surface))] border-t border-[hsl(var(--border-color))]">
         <div className="container-vg">
           <div className="overline mb-3">From Members</div>
           <h2 className="section-heading mb-12">WHAT THEY SAY</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {TESTIMONIALS.map((t) => (
-              <div key={t.id} className="card-vg p-6 border-b-2 border-b-[hsl(var(--red))]">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-11 h-11 rounded-full bg-[hsl(var(--red)/0.15)] border border-[hsl(var(--red))] flex items-center justify-center text-sm font-semibold text-[hsl(var(--red))]">{t.avatarInitials}</div>
-                  <div>
-                    <div className="font-semibold text-sm">{t.memberName}</div>
-                    <div className="text-xs text-[hsl(var(--text-muted))]">{t.membershipType} · {t.joinDuration}</div>
+          {loadingFeedback ? (
+            <div className="text-sm text-[hsl(var(--text-muted))]">Loading feedback...</div>
+          ) : memberFeedback.length === 0 ? (
+            <div className="text-sm text-[hsl(var(--text-muted))]">No member feedback yet.</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {memberFeedback.map((t) => (
+                <div key={t.id} className="card-vg p-6 border-b-2 border-b-[hsl(var(--red))]">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-11 h-11 rounded-full bg-[hsl(var(--red)/0.15)] border border-[hsl(var(--red))] flex items-center justify-center text-sm font-semibold text-[hsl(var(--red))]">
+                      {t.name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm">{t.name}</div>
+                      <div className="text-xs text-[hsl(var(--text-muted))]">{t.membership_type} · {t.member_duration}</div>
+                    </div>
                   </div>
+                  <StarRating value={t.rating} readOnly size={14} />
+                  <p className="mt-3 italic text-sm text-[hsl(var(--text-body))]">"{t.feedback_text}"</p>
                 </div>
-                <StarRating value={t.rating} readOnly size={14} />
-                <p className="mt-3 italic text-sm text-[hsl(var(--text-body))]">"{t.quote}"</p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </>

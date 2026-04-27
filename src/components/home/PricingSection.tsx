@@ -1,14 +1,11 @@
+import { useNavigate } from 'react-router-dom';
 import { Check, X } from 'lucide-react';
 import { MEMBERSHIP_PLANS } from '@/data/services';
 import type { MembershipPlan } from '@/types';
 import { VGButton } from '@/components/ui/VGButton';
 import { cn } from '@/lib/utils';
 
-const scrollToAuth = (): void => {
-  document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' });
-};
-
-function PricingCard({ p }: { p: MembershipPlan }) {
+function PricingCard({ p, onChoose }: { p: MembershipPlan; onChoose: () => void }) {
   return (
     <div className={cn(
       'card-vg p-8 relative flex flex-col',
@@ -34,7 +31,7 @@ function PricingCard({ p }: { p: MembershipPlan }) {
           </li>
         ))}
       </ul>
-      <VGButton variant={p.isPopular ? 'primary' : 'outline'} onClick={scrollToAuth} className="w-full">
+      <VGButton variant={p.isPopular ? 'primary' : 'outline'} onClick={onChoose} className="w-full">
         Choose {p.tier}
       </VGButton>
     </div>
@@ -42,6 +39,8 @@ function PricingCard({ p }: { p: MembershipPlan }) {
 }
 
 export function PricingSection() {
+  const navigate = useNavigate();
+
   return (
     <section id="pricing" className="py-24 container-vg">
       <div className="text-center mb-12">
@@ -50,7 +49,7 @@ export function PricingSection() {
         <p className="text-[hsl(var(--text-body))] mt-3">No contracts. No hidden fees. Cancel anytime.</p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {MEMBERSHIP_PLANS.map((p) => <PricingCard key={p.tier} p={p} />)}
+        {MEMBERSHIP_PLANS.map((p) => <PricingCard key={p.tier} p={p} onChoose={() => navigate('/register')} />)}
       </div>
     </section>
   );

@@ -74,6 +74,9 @@ export interface AICoachFormData {
   goal: GoalType;
   activityLevel: ActivityLevel;
   dietaryPreference: DietaryPreference;
+  trainingDays: number;
+  equipment: 'full_gym' | 'dumbbells' | 'bodyweight';
+  sleepHours: number;
   limitations: string;
 }
 
@@ -110,6 +113,13 @@ export interface AICoachResult {
   waterIntakeLitres: number;
   dietPlan: DayPlan[];
   workoutPlan: WorkoutDay[];
+}
+
+export interface SavedAIPlan {
+  id: string;
+  createdAt: string;
+  form: AICoachFormData;
+  result: AICoachResult;
 }
 
 export interface MembershipPlan {

@@ -3,19 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
-export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { isAdmin, isLoadingAuth } = useAuth();
+export function AuthenticatedRoute({ children }: { children: ReactNode }) {
+  const { isLoggedIn, isLoadingAuth } = useAuth();
   const navigate = useNavigate();
   const { addToast } = useToast();
 
   useEffect(() => {
-    if (!isLoadingAuth && !isAdmin) {
-      addToast('Admin access required. Please log in.', 'warning');
-      navigate('/', { replace: true });
+    if (!isLoadingAuth && !isLoggedIn) {
+      addToast('Please log in to continue.', 'warning');
+      navigate('/login', { replace: true });
     }
-  }, [isAdmin, isLoadingAuth, navigate, addToast]);
+  }, [isLoggedIn, isLoadingAuth, navigate, addToast]);
 
   if (isLoadingAuth) return null;
-  if (!isAdmin) return null;
+  if (!isLoggedIn) return null;
   return <>{children}</>;
 }

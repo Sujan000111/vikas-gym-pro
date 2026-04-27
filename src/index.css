@@ -6,19 +6,19 @@
 
 @layer base {
   :root {
-    /* VikasGym design tokens — dark luxury athletic */
-    --bg-primary: 0 0% 3%;        /* #080808 */
-    --bg-surface: 0 0% 7%;        /* #111111 */
-    --bg-elevated: 0 0% 10%;      /* #1a1a1a */
-    --border-color: 0 0% 13%;     /* #222222 */
+    /* Professional dark theme tokens */
+    --bg-primary: 222 47% 7%;
+    --bg-surface: 224 39% 11%;
+    --bg-elevated: 225 29% 15%;
+    --border-color: 217 24% 22%;
 
-    --red: 0 72% 51%;             /* #dc2626 */
-    --red-hover: 0 74% 42%;       /* #b91c1c */
+    --red: 0 74% 55%;
+    --red-hover: 0 74% 48%;
     --red-dim: 0 72% 51%;
 
-    --text-primary: 210 17% 98%;  /* #f9fafb */
-    --text-body: 220 9% 82%;      /* #d1d5db */
-    --text-muted: 220 9% 46%;     /* #6b7280 */
+    --text-primary: 210 20% 98%;
+    --text-body: 220 12% 83%;
+    --text-muted: 220 10% 62%;
 
     /* shadcn semantic mappings */
     --background: var(--bg-primary);
@@ -40,7 +40,7 @@
     --border: var(--border-color);
     --input: var(--border-color);
     --ring: var(--red);
-    --radius: 4px;
+    --radius: 12px;
 
     --sidebar-background: var(--bg-surface);
     --sidebar-foreground: var(--text-body);
@@ -60,8 +60,11 @@
     @apply bg-background text-foreground;
     font-family: 'Inter', system-ui, sans-serif;
     background-image:
-      radial-gradient(rgba(255,255,255,0.015) 1px, transparent 1px);
-    background-size: 3px 3px;
+      radial-gradient(circle at 15% 20%, hsl(var(--red) / 0.12), transparent 28%),
+      radial-gradient(circle at 85% 80%, hsl(var(--red) / 0.08), transparent 24%),
+      linear-gradient(to bottom, hsl(var(--bg-primary)), hsl(var(--bg-primary)));
+    background-attachment: fixed;
+    line-height: 1.55;
   }
   h1, h2, h3, h4, .font-display {
     font-family: 'Bebas Neue', 'Inter', sans-serif;
@@ -77,25 +80,30 @@
 @layer components {
   .container-vg {
     @apply mx-auto w-full px-4 sm:px-6 lg:px-8;
-    max-width: 1280px;
+    max-width: 1200px;
   }
   .section-heading {
-    @apply font-display text-4xl md:text-5xl pl-4 relative;
-    border-left: 4px solid hsl(var(--red));
-    line-height: 1;
+    @apply font-display text-4xl md:text-5xl leading-none;
   }
   .overline {
-    @apply text-xs uppercase tracking-[0.25em] font-semibold;
+    @apply text-xs uppercase tracking-[0.22em] font-semibold;
     color: hsl(var(--red));
   }
   .card-vg {
-    background: hsl(var(--bg-surface));
+    background: linear-gradient(
+      to bottom,
+      hsl(var(--bg-surface) / 0.88),
+      hsl(var(--bg-surface) / 0.72)
+    );
     border: 1px solid hsl(var(--border-color));
     border-radius: var(--radius);
-    transition: all 200ms ease;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+    transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
   }
   .card-vg:hover {
-    border-color: hsl(0 0% 22%);
+    border-color: hsl(var(--red) / 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
   }
   .badge-vg {
     @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium uppercase tracking-wider;

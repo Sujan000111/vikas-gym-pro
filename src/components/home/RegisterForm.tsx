@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { VGButton } from '@/components/ui/VGButton';
 import { useToast } from '@/context/ToastContext';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
 import type { MembershipTier } from '@/types';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 const GOALS: { value: string; label: string }[] = [
   { value: 'weight_loss', label: 'Lose Fat' },
@@ -30,14 +32,13 @@ const initial: RegState = {
   goal: 'muscle_gain', tier: 'Pro', password: '', confirm: '', terms: false,
 };
 
-interface StoredReg extends Omit<RegState, 'password' | 'confirm' | 'terms'> { id: string; createdAt: string }
-
 export function RegisterForm() {
   const [state, setState] = useState<RegState>(initial);
   const [errors, setErrors] = useState<ErrState>({});
   const [loading, setLoading] = useState<boolean>(false);
   const { addToast } = useToast();
-  const [registrations, setRegistrations] = useLocalStorage<StoredReg[]>('vg_registrations', []);
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
   const validate = (): boolean => {
     const e: ErrState = {};
@@ -59,17 +60,59 @@ export function RegisterForm() {
       return;
     }
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    const entry: StoredReg = {
-      id: `reg-${Date.now()}`,
-      fullName: state.fullName, email: state.email, phone: state.phone, dob: state.dob,
-      goal: state.goal, tier: state.tier, createdAt: new Date().toISOString(),
-    };
-    setRegistrations([entry, ...registrations]);
-    setLoading(false);
-    addToast(`Welcome, ${state.fullName.split(' ')[0]}! Your ${state.tier} registration is in.`, 'success', 4000);
-    setState(initial);
-    setErrors({});
+    try {
+      const email = state.email.trim().toLowerCase();
+      const { data: existing, error: existingError } = await supabase
+        .from('app_users')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+      if (existingError) throw existingError;
+      if (existing) throw new Error('Email already registered. Please log in.');
+
+      const { data: createdUser, error: createError } = await supabase
+        .from('app_users')
+        .insert({
+          full_name: state.fullName,
+          email,
+          phone: state.phone,
+          dob: state.dob,
+          password: state.password,
+          role: 'member',
+        })
+        .select('id')
+        .single();
+      if (createError) throw createError;
+
+      const { error: regError } = await supabase.from('registrations').insert({
+        full_name: state.fullName,
+        email,
+        phone: state.phone,
+        dob: state.dob,
+        goal: state.goal,
+        tier: state.tier,
+      });
+      if (regError) throw regError;
+
+      if (!createdUser?.id) {
+        throw new Error('Could not create account.');
+      }
+
+      const loginResult = await login(email, state.password);
+      if (!loginResult.ok) {
+        throw new Error(loginResult.message ?? 'Account created, but auto-login failed.');
+      }
+
+      addToast(`Welcome, ${state.fullName.split(' ')[0]}! Registration successful.`, 'success', 4000);
+      setState(initial);
+      setErrors({});
+      navigate('/profile');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
+      addToast(message, 'error', 5000);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const inputCls = (key: keyof RegState): string =>
@@ -82,7 +125,7 @@ export function RegisterForm() {
     <form onSubmit={handleSubmit} className="card-vg p-8 space-y-5">
       <div>
         <div className="overline mb-2">New Member</div>
-        <h3 className="font-display text-3xl">REGISTER</h3>
+        <h3 className="font-display text-3xl">Create Account</h3>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -157,6 +200,12 @@ export function RegisterForm() {
       {errors.terms && <p className="text-xs text-red-400 -mt-3">{errors.terms}</p>}
 
       <VGButton type="submit" loading={loading} className="w-full">Create Account</VGButton>
+      <p className="text-sm text-[hsl(var(--text-muted))] text-center">
+        Already have an account?{' '}
+        <Link to="/login" className="text-[hsl(var(--red))] hover:underline font-medium">
+          Sign in
+        </Link>
+      </p>
     </form>
   );
 }

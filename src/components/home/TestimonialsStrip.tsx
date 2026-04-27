@@ -1,9 +1,21 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TESTIMONIALS } from '@/data/testimonials';
 import { StarRating } from '@/components/ui/StarRating';
+import type { MembershipTier } from '@/types';
+import { supabase } from '@/lib/supabase';
+
+interface VoiceItem {
+  id: string;
+  memberName: string;
+  membershipType: MembershipTier;
+  rating: 1 | 2 | 3 | 4 | 5;
+  quote: string;
+  avatarInitials: string;
+}
 
 export function TestimonialsStrip() {
   const ref = useRef<HTMLDivElement>(null);
+  const [voices, setVoices] = useState<VoiceItem[]>(TESTIMONIALS);
 
   useEffect(() => {
     const el = ref.current;
@@ -18,8 +30,38 @@ export function TestimonialsStrip() {
     return () => window.clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    const loadVoices = async (): Promise<void> => {
+      const { data, error } = await supabase
+        .from('feedback')
+        .select('id,name,membership_type,rating,feedback_text')
+        .order('created_at', { ascending: false })
+        .limit(12);
+
+      if (error || !data || data.length === 0) return;
+
+      const mapped: VoiceItem[] = data.map((r) => ({
+        id: String(r.id),
+        memberName: String(r.name),
+        membershipType: r.membership_type as MembershipTier,
+        rating: Number(r.rating) as 1 | 2 | 3 | 4 | 5,
+        quote: String(r.feedback_text),
+        avatarInitials: String(r.name)
+          .split(' ')
+          .map((p) => p[0])
+          .slice(0, 2)
+          .join('')
+          .toUpperCase(),
+      }));
+
+      setVoices(mapped);
+    };
+
+    void loadVoices();
+  }, []);
+
   // Duplicate for visual continuity
-  const items = [...TESTIMONIALS, ...TESTIMONIALS];
+  const items = [...voices, ...voices];
 
   return (
     <section className="py-20">

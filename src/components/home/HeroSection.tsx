@@ -1,12 +1,11 @@
+import { useNavigate } from 'react-router-dom';
 import { VGButton } from '@/components/ui/VGButton';
 
-const scrollTo = (id: string): void => {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-};
-
 export function HeroSection() {
+  const navigate = useNavigate();
+
   return (
-    <section className="relative min-h-[100vh] flex items-center pt-16 overflow-hidden">
+    <section className="relative min-h-[92vh] flex items-center pt-20 pb-12 overflow-hidden">
       <div
         className="absolute inset-0 opacity-40"
         style={{
@@ -14,27 +13,27 @@ export function HeroSection() {
         }}
         aria-hidden
       />
-      <div className="container-vg relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+      <div className="container-vg relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
         <div className="lg:col-span-8">
           <div className="overline mb-4">VikasGym · Bengaluru</div>
-          <h1 className="font-display text-7xl sm:text-8xl md:text-[10rem] leading-[0.85] text-[hsl(var(--text-primary))]">
-            FORGE YOUR
+          <h1 className="font-display text-6xl sm:text-7xl md:text-[7rem] leading-[0.9] text-[hsl(var(--text-primary))]">
+            Build Strength.
             <br />
-            <span className="text-[hsl(var(--red))]">LIMITS.</span>
+            <span className="text-[hsl(var(--red))]">Build Discipline.</span>
           </h1>
-          <p className="mt-8 max-w-xl text-lg text-[hsl(var(--text-body))]">
-            Science-backed training. Real results. New Horizon's finest gym — built by lifters, for lifters.
+          <p className="mt-7 max-w-2xl text-lg text-[hsl(var(--text-body))]">
+            Structured coaching for students and professionals who want measurable progress, better health, and a gym culture that stays serious.
           </p>
-          <div className="mt-10 flex flex-wrap gap-4">
-            <VGButton size="lg" variant="primary" onClick={() => scrollTo('auth')}>Join Now</VGButton>
-            <VGButton size="lg" variant="outline" onClick={() => scrollTo('pricing')}>Explore Plans</VGButton>
+          <div className="mt-9 flex flex-wrap gap-4">
+            <VGButton size="lg" variant="primary" onClick={() => navigate('/register')}>Start Membership</VGButton>
+            <VGButton size="lg" variant="outline" onClick={() => navigate('/services')}>View Plans</VGButton>
           </div>
         </div>
         <div className="hidden lg:block lg:col-span-4">
           <div className="card-vg p-8 space-y-6 bg-[hsl(var(--bg-surface))]/80 backdrop-blur">
             <div>
-              <div className="overline mb-2">Today</div>
-              <div className="font-display text-5xl">5:30 — 22:30</div>
+              <div className="overline mb-2">Today's Schedule</div>
+              <div className="font-display text-5xl">5:30 AM - 10:30 PM</div>
             </div>
             <div className="h-px bg-[hsl(var(--border-color))]" />
             <div className="space-y-3 text-sm">

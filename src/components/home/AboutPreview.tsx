@@ -1,19 +1,19 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, GraduationCap } from 'lucide-react';
 
-const CREDENTIALS: string[] = ['NHCE Alumni', 'NSCA-CSCS', 'Precision Nutrition', '9+ Years Coaching'];
+const CREDENTIALS: string[] = ['Final Year - NHCE', 'NSCA-CSCS', 'Precision Nutrition', '9+ Years Coaching'];
 
 export function AboutPreview() {
   return (
     <section className="py-24 container-vg grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
       <div>
         <div className="overline mb-3">Who We Are</div>
-        <h2 className="section-heading mb-6">BUILT BY A LIFTER.<br />RUN BY COACHES.</h2>
+        <h2 className="section-heading mb-6">Built by a lifter.<br />Run by professionals.</h2>
         <p className="text-[hsl(var(--text-body))] mb-4">
-          VikasGym started in a small studio near New Horizon College of Engineering with one rule: no fluff, no shortcuts, just real coaching. Today we serve 500+ members with the same standard.
+          VikasGym started near New Horizon College of Engineering with one clear rule: no fluff and no shortcuts, only quality coaching and consistency.
         </p>
         <p className="text-[hsl(var(--text-body))] mb-6">
-          Every program is built on evidence. Every coach is certified. Every member gets attention — not just a swipe-card.
+          Founded by Vikas AP while in his final year of engineering, the gym now supports 500+ members through structured plans, certified trainers, and personal accountability.
         </p>
         <Link to="/about" className="inline-flex items-center gap-2 text-[hsl(var(--red))] hover:gap-3 transition-all font-semibold uppercase tracking-wider text-sm">
           Read our story <ArrowRight className="w-4 h-4" />

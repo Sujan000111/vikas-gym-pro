@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, BarChart3, CreditCard, Settings, LogOut,
-  Search, Plus, Pencil, Trash2, MessageCircle, X, ChevronDown, ChevronLeft, ChevronRight, Bell,
+  Search, Plus, Pencil, Trash2, X, ChevronDown, ChevronLeft, ChevronRight, Bell,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -12,9 +12,9 @@ import { MetricCard } from '@/components/ui/MetricCard';
 import { VGButton } from '@/components/ui/VGButton';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { MOCK_MEMBERS } from '@/data/members';
 import type { DashboardSection, Member, MemberStatus, MembershipTier } from '@/types';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 
 const NAV: { id: DashboardSection; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -22,17 +22,6 @@ const NAV: { id: DashboardSection; label: string; icon: typeof LayoutDashboard }
   { id: 'reports', label: 'Reports', icon: BarChart3 },
   { id: 'payments', label: 'Payments', icon: CreditCard },
   { id: 'settings', label: 'Settings', icon: Settings },
-];
-
-const REVENUE: { month: string; value: number }[] = [
-  { month: 'Nov', value: 320000 }, { month: 'Dec', value: 365000 },
-  { month: 'Jan', value: 410000 }, { month: 'Feb', value: 395000 },
-  { month: 'Mar', value: 445000 }, { month: 'Apr', value: 482500 },
-];
-const TIER_DATA: { name: string; value: number; color: string }[] = [
-  { name: 'Basic', value: 40, color: '#6b7280' },
-  { name: 'Pro', value: 45, color: '#dc2626' },
-  { name: 'Elite', value: 15, color: '#f9fafb' },
 ];
 
 const STATUS_CLS: Record<MemberStatus, string> = {
@@ -157,7 +146,6 @@ function MembersTable({ members, onEdit, onDelete }: {
                 <td className="text-right pr-2">
                   <div className="flex justify-end gap-1">
                     <button onClick={() => onEdit(m)} title="Edit" className="w-8 h-8 flex items-center justify-center text-[hsl(var(--text-body))] hover:text-[hsl(var(--red))] transition rounded-sm hover:bg-[hsl(var(--bg-elevated))]"><Pencil className="w-4 h-4" /></button>
-                    <button onClick={() => window.open(`https://wa.me/${m.phone.replace(/\D/g, '')}`, '_blank')} title="WhatsApp" className="w-8 h-8 flex items-center justify-center text-[hsl(var(--text-body))] hover:text-green-400 transition rounded-sm hover:bg-[hsl(var(--bg-elevated))]"><MessageCircle className="w-4 h-4" /></button>
                     <button onClick={() => onDelete(m.id)} title="Delete" className="w-8 h-8 flex items-center justify-center text-[hsl(var(--text-body))] hover:text-red-400 transition rounded-sm hover:bg-[hsl(var(--bg-elevated))]"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </td>
@@ -183,6 +171,51 @@ function MembersTable({ members, onEdit, onDelete }: {
 }
 
 interface DrawerForm extends Omit<Member, 'id' | 'avatarInitials'> {}
+
+interface MemberRow {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  dob: string | null;
+  membership_tier: MembershipTier;
+  join_date: string;
+  expiry_date: string | null;
+  status: MemberStatus;
+  assigned_trainer: string | null;
+  notes: string | null;
+}
+
+interface AppUserRow {
+  full_name: string;
+  email: string;
+  phone: string | null;
+  dob: string | null;
+  created_at: string;
+}
+
+const initialsOf = (name: string): string =>
+  name
+    .split(' ')
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'NA';
+
+const toMember = (row: MemberRow): Member => ({
+  id: row.id,
+  name: row.name,
+  email: row.email,
+  phone: row.phone,
+  dob: row.dob ?? '',
+  membershipTier: row.membership_tier,
+  joinDate: row.join_date,
+  expiryDate: row.expiry_date ?? '',
+  status: row.status,
+  assignedTrainer: row.assigned_trainer ?? '',
+  notes: row.notes ?? '',
+  avatarInitials: initialsOf(row.name),
+});
 
 function MemberDrawer({ open, onClose, onSave, editMember }: {
   open: boolean;
@@ -302,34 +335,195 @@ function ExpiryAlerts({ members, onRemind }: { members: Member[]; onRemind: (n: 
 
 export default function Dashboard() {
   const [section, setSection] = useState<DashboardSection>('overview');
-  const [members, setMembers] = useState<Member[]>(MOCK_MEMBERS);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [membersLoading, setMembersLoading] = useState<boolean>(true);
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [editMember, setEditMember] = useState<Member | null>(null);
   const { logout, userEmail } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
+  const chartData = useMemo(() => {
+    const months = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - (5 - i));
+      const month = d.toLocaleString('en-US', { month: 'short' });
+      return { month, value: 0 };
+    });
+    const map = new Map(months.map((m) => [m.month, m]));
+    members.forEach((m) => {
+      const d = new Date(m.joinDate);
+      if (Number.isNaN(d.getTime())) return;
+      const key = d.toLocaleString('en-US', { month: 'short' });
+      const row = map.get(key);
+      if (row) row.value += 1;
+    });
+    return months;
+  }, [members]);
+
+  const tierData = useMemo(() => {
+    const total = members.length || 1;
+    const basic = members.filter((m) => m.membershipTier === 'Basic').length;
+    const pro = members.filter((m) => m.membershipTier === 'Pro').length;
+    const elite = members.filter((m) => m.membershipTier === 'Elite').length;
+    return [
+      { name: 'Basic', value: Math.round((basic / total) * 100), color: '#6b7280' },
+      { name: 'Pro', value: Math.round((pro / total) * 100), color: '#dc2626' },
+      { name: 'Elite', value: Math.round((elite / total) * 100), color: '#f9fafb' },
+    ];
+  }, [members]);
+
+  useEffect(() => {
+    const loadMembers = async (): Promise<void> => {
+      setMembersLoading(true);
+      // Auto-sync: ensure registered app users also exist in members table.
+      const { data: appUsers, error: appUsersError } = await supabase
+        .from('app_users')
+        .select('full_name,email,phone,dob,created_at')
+        .neq('email', 'vikasap2005@gmail.com');
+      if (appUsersError) {
+        addToast('Could not read app users for member sync.', 'error');
+      }
+
+      const { data: existingMembers, error: existingMembersError } = await supabase
+        .from('members')
+        .select('email');
+      if (existingMembersError) {
+        addToast('Could not read existing members before sync.', 'error');
+      }
+
+      if (appUsers && existingMembers) {
+        const existingEmails = new Set((existingMembers as { email: string }[]).map((m) => m.email.toLowerCase()));
+        const toInsert = (appUsers as AppUserRow[])
+          .filter((u) => !existingEmails.has(u.email.toLowerCase()))
+          .map((u) => {
+            const joinDate = String(u.created_at ?? '').slice(0, 10) || new Date().toISOString().slice(0, 10);
+            const expiry = new Date(joinDate);
+            expiry.setMonth(expiry.getMonth() + 1);
+            return {
+              name: u.full_name,
+              email: u.email,
+              phone: u.phone ?? '',
+              dob: u.dob,
+              membership_tier: 'Pro',
+              join_date: joinDate,
+              expiry_date: expiry.toISOString().slice(0, 10),
+              status: 'Active',
+              assigned_trainer: 'Vikas AP',
+              notes: 'Auto-added from registered users',
+            };
+          });
+
+        if (toInsert.length > 0) {
+          const { error: syncError } = await supabase
+            .from('members')
+            .upsert(toInsert, { onConflict: 'email' });
+          if (syncError) {
+            addToast('Member sync blocked by database policy. Showing app users directly.', 'warning');
+          }
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('members')
+        .select('id,name,email,phone,dob,membership_tier,join_date,expiry_date,status,assigned_trainer,notes')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        addToast('Could not load members from database.', 'error');
+      } else {
+        const dbMembers = (data as MemberRow[]).map(toMember);
+        const byEmail = new Set(dbMembers.map((m) => m.email.toLowerCase()));
+        const fallbackFromUsers = ((appUsers ?? []) as AppUserRow[])
+          .filter((u) => !byEmail.has(u.email.toLowerCase()))
+          .map((u) => {
+            const joinDate = String(u.created_at ?? '').slice(0, 10) || new Date().toISOString().slice(0, 10);
+            const expiry = new Date(joinDate);
+            expiry.setMonth(expiry.getMonth() + 1);
+            return {
+              id: `app-${u.email.toLowerCase()}`,
+              name: u.full_name,
+              email: u.email,
+              phone: u.phone ?? '',
+              dob: u.dob ?? '',
+              membershipTier: 'Pro' as MembershipTier,
+              joinDate,
+              expiryDate: expiry.toISOString().slice(0, 10),
+              status: 'Active' as MemberStatus,
+              assignedTrainer: 'Vikas AP',
+              notes: 'From app_users (not yet persisted in members)',
+              avatarInitials: initialsOf(u.full_name),
+            };
+          });
+        setMembers([...dbMembers, ...fallbackFromUsers]);
+      }
+      setMembersLoading(false);
+    };
+
+    loadMembers();
+  }, [addToast]);
+
   const handleLogout = (): void => {
-    logout();
-    addToast('Logged out.', 'info');
-    navigate('/');
+    logout()
+      .then(() => {
+        addToast('Logged out.', 'info');
+        navigate('/');
+      })
+      .catch(() => {
+        addToast('Could not log out.', 'error');
+      });
   };
 
-  const handleSave = (data: DrawerForm, editingId?: string): void => {
+  const handleSave = async (data: DrawerForm, editingId?: string): Promise<void> => {
+    const payload = {
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      dob: data.dob || null,
+      membership_tier: data.membershipTier,
+      join_date: data.joinDate,
+      expiry_date: data.expiryDate || null,
+      status: data.status,
+      assigned_trainer: data.assignedTrainer || null,
+      notes: data.notes || null,
+    };
+
     if (editingId) {
-      setMembers((ms) => ms.map((m) => m.id === editingId ? { ...m, ...data } : m));
+      const { data: updated, error } = await supabase
+        .from('members')
+        .update(payload)
+        .eq('id', editingId)
+        .select('id,name,email,phone,dob,membership_tier,join_date,expiry_date,status,assigned_trainer,notes')
+        .single();
+      if (error) {
+        addToast(error.message, 'error');
+        return;
+      }
+      setMembers((ms) => ms.map((m) => (m.id === editingId ? toMember(updated as MemberRow) : m)));
       addToast('Member updated.', 'success');
     } else {
-      const initials = data.name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase() || 'NM';
-      const newM: Member = { id: `m-${Date.now()}`, ...data, avatarInitials: initials };
-      setMembers((ms) => [newM, ...ms]);
+      const { data: created, error } = await supabase
+        .from('members')
+        .insert(payload)
+        .select('id,name,email,phone,dob,membership_tier,join_date,expiry_date,status,assigned_trainer,notes')
+        .single();
+      if (error) {
+        addToast(error.message, 'error');
+        return;
+      }
+      setMembers((ms) => [toMember(created as MemberRow), ...ms]);
       addToast('Member added.', 'success');
     }
     setDrawerOpen(false);
     setEditMember(null);
   };
 
-  const handleDelete = (id: string): void => {
+  const handleDelete = async (id: string): Promise<void> => {
+    const { error } = await supabase.from('members').delete().eq('id', id);
+    if (error) {
+      addToast(error.message, 'error');
+      return;
+    }
     setMembers((ms) => ms.filter((m) => m.id !== id));
     addToast('Member removed.', 'success');
   };
@@ -394,14 +588,17 @@ export default function Dashboard() {
               <MetricCard label="Total Members" value={members.length} change="+12 this month" changeType="up" colorAccent="hsl(220 70% 50% / 0.06)" />
               <MetricCard label="Active" value={members.filter((m) => m.status === 'Active').length} change="+8%" changeType="up" colorAccent="hsl(140 70% 45% / 0.06)" />
               <MetricCard label="Expiring (7d)" value={members.filter((m) => m.status === 'Expiring').length} change="Renewals due" changeType="down" colorAccent="hsl(40 90% 55% / 0.06)" />
-              <MetricCard label="Revenue (Apr)" value="₹4,82,500" change="+15%" changeType="up" colorAccent="hsl(0 72% 51% / 0.06)" />
+              <MetricCard label="New Members (30d)" value={members.filter((m) => {
+                const t = new Date(m.joinDate).getTime();
+                return !Number.isNaN(t) && t >= Date.now() - 30 * 86400000;
+              }).length} change="From DB" changeType="up" colorAccent="hsl(0 72% 51% / 0.06)" />
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="card-vg p-6 lg:col-span-2">
-                <h3 className="font-display text-2xl mb-4">REVENUE TREND</h3>
+                <h3 className="font-display text-2xl mb-4">MEMBER GROWTH TREND</h3>
                 <div style={{ width: '100%', height: 280 }}>
                   <ResponsiveContainer>
-                    <BarChart data={REVENUE}>
+                    <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                       <XAxis dataKey="month" stroke="#6b7280" fontSize={12} />
                       <YAxis stroke="#6b7280" fontSize={12} />
@@ -416,8 +613,8 @@ export default function Dashboard() {
                 <div style={{ width: '100%', height: 280 }}>
                   <ResponsiveContainer>
                     <PieChart>
-                      <Pie data={TIER_DATA} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={3}>
-                        {TIER_DATA.map((d) => <Cell key={d.name} fill={d.color} stroke="#080808" strokeWidth={2} />)}
+                      <Pie data={tierData} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={3}>
+                        {tierData.map((d) => <Cell key={d.name} fill={d.color} stroke="#080808" strokeWidth={2} />)}
                       </Pie>
                       <Legend wrapperStyle={{ fontSize: 12, color: '#d1d5db' }} />
                       <Tooltip contentStyle={{ background: '#111', border: '1px solid #222', borderRadius: 4 }} />
@@ -442,7 +639,11 @@ export default function Dashboard() {
               </div>
               <VGButton onClick={handleAdd}><Plus className="w-4 h-4" /> Add Member</VGButton>
             </div>
-            <MembersTable members={members} onEdit={handleEdit} onDelete={handleDelete} />
+            {membersLoading ? (
+              <div className="card-vg p-12 text-center text-[hsl(var(--text-muted))]">Loading members...</div>
+            ) : (
+              <MembersTable members={members} onEdit={handleEdit} onDelete={(id) => void handleDelete(id)} />
+            )}
           </>
         )}
 
@@ -451,10 +652,10 @@ export default function Dashboard() {
             <h1 className="font-display text-5xl">REPORTS</h1>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="card-vg p-6">
-                <h3 className="font-display text-2xl mb-4">REVENUE — 6 MONTHS</h3>
+                <h3 className="font-display text-2xl mb-4">MEMBER GROWTH — 6 MONTHS</h3>
                 <div style={{ width: '100%', height: 320 }}>
                   <ResponsiveContainer>
-                    <BarChart data={REVENUE}>
+                    <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                       <XAxis dataKey="month" stroke="#6b7280" fontSize={12} />
                       <YAxis stroke="#6b7280" fontSize={12} />
@@ -511,7 +712,12 @@ export default function Dashboard() {
         )}
       </div>
 
-      <MemberDrawer open={drawerOpen} onClose={() => { setDrawerOpen(false); setEditMember(null); }} onSave={handleSave} editMember={editMember} />
+      <MemberDrawer
+        open={drawerOpen}
+        onClose={() => { setDrawerOpen(false); setEditMember(null); }}
+        onSave={(m, editingId) => { void handleSave(m, editingId); }}
+        editMember={editMember}
+      />
     </div>
   );
 }

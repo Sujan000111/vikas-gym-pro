@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { VGButton } from '@/components/ui/VGButton';
 import { useAuth } from '@/context/AuthContext';
@@ -15,6 +15,9 @@ export function LoginForm() {
   const { addToast } = useToast();
   const navigate = useNavigate();
 
+  const inputCls =
+    'w-full bg-[hsl(var(--bg-elevated))] border border-[hsl(var(--border-color))] rounded-lg px-4 h-11 text-sm focus:outline-none focus:border-[hsl(var(--red))] transition';
+
   const handleSubmit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
     if (!state.email || !state.password) {
@@ -22,14 +25,13 @@ export function LoginForm() {
       return;
     }
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    const ok = login(state.email, state.password);
+    const result = await login(state.email, state.password);
     setLoading(false);
-    if (ok) {
-      addToast('Welcome back, admin.', 'success');
+    if (result.ok) {
+      addToast('Welcome back.', 'success');
       navigate('/dashboard');
     } else {
-      addToast('Invalid credentials. Try admin@vikasgym.com / Admin@123', 'error', 5000);
+      addToast(result.message ?? 'Invalid credentials.', 'error', 5000);
     }
   };
 
@@ -41,8 +43,8 @@ export function LoginForm() {
     <form onSubmit={handleSubmit} className="card-vg p-8 space-y-5">
       <div>
         <div className="overline mb-2">Existing Member</div>
-        <h3 className="font-display text-3xl">LOG IN</h3>
-        <p className="text-xs text-[hsl(var(--text-muted))] mt-1">Demo admin: admin@vikasgym.com / Admin@123</p>
+        <h3 className="font-display text-3xl">Login</h3>
+        <p className="text-xs text-[hsl(var(--text-muted))] mt-1">Use your registered email and password.</p>
       </div>
 
       <div>
@@ -51,8 +53,9 @@ export function LoginForm() {
           type="email"
           value={state.email}
           onChange={(e) => setState({ ...state, email: e.target.value })}
-          className="w-full bg-[hsl(var(--bg-elevated))] border border-[hsl(var(--border-color))] rounded-sm px-3 h-11 text-sm focus:outline-none focus:border-[hsl(var(--red))] transition"
+          className={inputCls}
           placeholder="you@email.com"
+          autoComplete="email"
         />
       </div>
 
@@ -63,10 +66,16 @@ export function LoginForm() {
             type={showPwd ? 'text' : 'password'}
             value={state.password}
             onChange={(e) => setState({ ...state, password: e.target.value })}
-            className="w-full bg-[hsl(var(--bg-elevated))] border border-[hsl(var(--border-color))] rounded-sm px-3 pr-10 h-11 text-sm focus:outline-none focus:border-[hsl(var(--red))] transition"
+            className={`${inputCls} pr-12`}
             placeholder="••••••••"
+            autoComplete="current-password"
           />
-          <button type="button" onClick={() => setShowPwd((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))]">
+          <button
+            type="button"
+            onClick={() => setShowPwd((v) => !v)}
+            aria-label={showPwd ? 'Hide password' : 'Show password'}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-md flex items-center justify-center text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--bg-surface))] transition"
+          >
             {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
         </div>
@@ -86,6 +95,12 @@ export function LoginForm() {
       </div>
 
       <VGButton type="submit" loading={loading} className="w-full">Log In</VGButton>
+      <p className="text-sm text-[hsl(var(--text-muted))] text-center">
+        New to VikasGym?{' '}
+        <Link to="/register" className="text-[hsl(var(--red))] hover:underline font-medium">
+          Create an account
+        </Link>
+      </p>
     </form>
   );
 }

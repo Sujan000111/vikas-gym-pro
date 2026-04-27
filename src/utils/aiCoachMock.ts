@@ -31,7 +31,7 @@ const buildDietPlan = (form: AICoachFormData): DayPlan[] => {
   }));
 };
 
-const buildWorkoutPlan = (): WorkoutDay[] => [
+const buildWorkoutPlan = (trainingDays: number, equipment: AICoachFormData['equipment']): WorkoutDay[] => [
   {
     day: 'Monday', focus: 'Push (Chest / Shoulders / Triceps)',
     exercises: [
@@ -83,17 +83,52 @@ const buildWorkoutPlan = (): WorkoutDay[] => [
   },
 ];
 
+const adaptWorkoutPlan = (base: WorkoutDay[], trainingDays: number, equipment: AICoachFormData['equipment']): WorkoutDay[] => {
+  const count = Math.min(Math.max(trainingDays, 3), 7);
+  const sliced = base.slice(0, count);
+  if (equipment === 'full_gym') return sliced;
+
+  return sliced.map((day) => ({
+    ...day,
+    focus: equipment === 'bodyweight' ? `${day.focus} (Bodyweight)` : `${day.focus} (Dumbbells)`,
+    exercises: day.exercises.map((ex) => {
+      if (equipment === 'bodyweight') {
+        return {
+          ...ex,
+          name: ex.name
+            .replace('Barbell', 'Bodyweight')
+            .replace('DB', 'Bodyweight')
+            .replace('Cable', 'Band')
+            .replace('Lat Pulldown', 'Pull-up / Band Row'),
+        };
+      }
+      return {
+        ...ex,
+        name: ex.name
+          .replace('Barbell', 'Dumbbell')
+          .replace('Cable', 'Dumbbell')
+          .replace('Lat Pulldown', 'Single Arm Row'),
+      };
+    }),
+  }));
+};
+
 export async function generateAIPlan(form: AICoachFormData): Promise<AICoachResult> {
   // Simulated latency for realism
   await new Promise((r) => setTimeout(r, 1200));
   const bmr = calculateBMR(form.weightKg, form.heightCm, form.age, form.gender);
   const tdee = calculateTDEE(bmr, form.activityLevel);
-  const targetCalories = calculateTarget(tdee, form.goal);
+  const rawTarget = calculateTarget(tdee, form.goal);
+  // Safety bounds so recommendations stay practical.
+  const min = form.gender === 'female' ? 1200 : 1500;
+  const max = 4500;
+  const targetCalories = Math.min(max, Math.max(min, rawTarget));
   const { protein, carbs, fat } = calculateMacros(targetCalories, form.goal, form.weightKg);
+  const sleepPenalty = form.sleepHours < 6 ? 0.95 : 1;
   return {
-    bmr, tdee, targetCalories, protein, carbs, fat,
+    bmr, tdee, targetCalories, protein: Math.round(protein * sleepPenalty), carbs, fat,
     waterIntakeLitres: waterIntakeLitres(form.weightKg),
     dietPlan: buildDietPlan(form),
-    workoutPlan: buildWorkoutPlan(),
+    workoutPlan: adaptWorkoutPlan(buildWorkoutPlan(form.trainingDays, form.equipment), form.trainingDays, form.equipment),
   };
 }

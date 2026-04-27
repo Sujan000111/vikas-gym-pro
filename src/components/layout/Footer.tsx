@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Dumbbell, Instagram, Linkedin, MessageCircle, MapPin, Phone, Mail } from 'lucide-react';
+import { Dumbbell, Instagram, Linkedin, MapPin, Phone, Mail } from 'lucide-react';
 
 export function Footer() {
   return (
@@ -15,7 +15,7 @@ export function Footer() {
             </span>
           </Link>
           <p className="text-sm text-[hsl(var(--text-muted))]">
-            Science-backed strength training. Founded by Vikas AP, New Horizon College of Engineering.
+            Science-backed strength training in Bengaluru. Founded by Vikas AP, final-year engineering student and head coach.
           </p>
         </div>
 
@@ -49,8 +49,8 @@ export function Footer() {
         <div>
           <h4 className="overline mb-4">Follow</h4>
           <div className="flex gap-3">
-            {[Instagram, Linkedin, MessageCircle].map((Icon, i) => (
-              <a key={i} href="#" className="w-9 h-9 border border-[hsl(var(--border-color))] rounded-sm flex items-center justify-center text-[hsl(var(--text-body))] hover:border-[hsl(var(--red))] hover:text-[hsl(var(--red))] transition">
+            {[Instagram, Linkedin].map((Icon, i) => (
+              <a key={i} href="#" aria-label="Social link" className="w-9 h-9 border border-[hsl(var(--border-color))] rounded-sm flex items-center justify-center text-[hsl(var(--text-body))] hover:border-[hsl(var(--red))] hover:text-[hsl(var(--red))] transition">
                 <Icon className="w-4 h-4" />
               </a>
             ))}
